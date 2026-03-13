@@ -94,23 +94,33 @@ const JoinMeetPage = ({
     // username is provided via props and used for UI/messages
   }, [isLoggedIn]);
 
-  // Fetch TURN credentials directly from Metered.ca REST API on mount
+  // Fetch TURN credentials from our server on mount
   useEffect(() => {
     const fetchTurnCredentials = async () => {
       try {
-        const url = `https://vi-meet.metered.live/api/v1/turn/credentials?apiKey=${import.meta.env.VITE_METERED_API_KEY}`;
-        console.log("[WebRTC] Fetching TURN credentials from:", url);
-        const response = await fetch(url);
+        const serverUrl = import.meta.env.VITE_SERVER_URL || window.location.origin;
+        console.log("[WebRTC] Fetching TURN credentials from:", `${serverUrl}/api/turn-credentials`);
+        const response = await fetch(`${serverUrl}/api/turn-credentials`);
+        console.log("[WebRTC] TURN credentials response:", response);
         if (response.ok) {
-          const iceServers = await response.json();
-          if (Array.isArray(iceServers) && iceServers.length > 0) {
-            setIceServers(iceServers);
-            console.log("[WebRTC] TURN credentials fetched successfully:", iceServers.length, "servers", iceServers);
+          const credentials = await response.json();
+          if (Array.isArray(credentials) && credentials.length > 0) {
+            // Ensure we always include a STUN server alongside TURN servers
+            const hasStun = credentials.some(s => 
+              (typeof s.urls === 'string' && s.urls.startsWith('stun:')) ||
+              (Array.isArray(s.urls) && s.urls.some(u => u.startsWith('stun:')))
+            );
+            const finalServers = hasStun
+              ? credentials
+              : [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }, ...credentials];
+            
+            setIceServers(finalServers);
+            console.log("[WebRTC] TURN credentials fetched successfully:", finalServers.length, "servers", finalServers);
           } else {
-            console.warn("[WebRTC] Metered returned empty credentials, keeping STUN fallback");
+            console.warn("[WebRTC] Server returned empty credentials, keeping STUN fallback");
           }
         } else {
-          console.warn("[WebRTC] Metered API returned status:", response.status);
+          console.warn("[WebRTC] TURN credentials endpoint returned:", response.status);
         }
       } catch (error) {
         console.warn("[WebRTC] Failed to fetch TURN credentials, using fallback STUN servers:", error.message);

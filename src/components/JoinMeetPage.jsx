@@ -59,36 +59,17 @@ const JoinMeetPage = ({
   const peerConnectionsRef = useRef({});
   const [remoteStreams, setRemoteStreams] = useState({}); // { [socketId]: MediaStream }
   const remoteStreamsRef = useRef({});
+  // ICE servers state — starts with a basic STUN fallback, updated with TURN creds from API
+  const [iceServers, setIceServers] = useState([
+    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  ]);
   const sendersRef = useRef({}); // { [peerId]: { audio: RTCRtpSender|null, video: RTCRtpSender|null } }
+  // rtcConfig reactively updates when iceServers state changes (e.g. after fetching TURN creds)
   const rtcConfig = useMemo(() => ({
     bundlePolicy: 'max-bundle',
     iceCandidatePoolSize: 2,
-    iceServers: [
-      {
-        urls: "stun:stun.relay.metered.ca:80",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:80",
-        username: "32d1831f7fb68465978ef471",
-        credential: "fTOLiB849z/qS3MA",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:80?transport=tcp",
-        username: "32d1831f7fb68465978ef471",
-        credential: "fTOLiB849z/qS3MA",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:443",
-        username: "32d1831f7fb68465978ef471",
-        credential: "fTOLiB849z/qS3MA",
-      },
-      {
-        urls: "turns:global.relay.metered.ca:443?transport=tcp",
-        username: "32d1831f7fb68465978ef471",
-        credential: "fTOLiB849z/qS3MA",
-      },
-    ],
-  }), []);
+    iceServers: iceServers,
+  }), [iceServers]);
   
   const pathname = window.location.pathname;
   const segments = pathname.split("/");
@@ -118,16 +99,30 @@ const JoinMeetPage = ({
     const fetchTurnCredentials = async () => {
       try {
         const serverUrl = import.meta.env.VITE_SERVER_URL || window.location.origin;
+        console.log("[WebRTC] Fetching TURN credentials from:", `${serverUrl}/api/turn-credentials`);
         const response = await fetch(`${serverUrl}/api/turn-credentials`);
         if (response.ok) {
           const credentials = await response.json();
           if (Array.isArray(credentials) && credentials.length > 0) {
-            setIceServers(credentials);
-            console.log("TURN credentials fetched successfully", credentials.length, "servers");
+            // Ensure we always include a STUN server alongside TURN servers
+            const hasStun = credentials.some(s => 
+              (typeof s.urls === 'string' && s.urls.startsWith('stun:')) ||
+              (Array.isArray(s.urls) && s.urls.some(u => u.startsWith('stun:')))
+            );
+            const finalServers = hasStun
+              ? credentials
+              : [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }, ...credentials];
+            
+            setIceServers(finalServers);
+            console.log("[WebRTC] TURN credentials fetched successfully:", finalServers.length, "servers", finalServers);
+          } else {
+            console.warn("[WebRTC] Server returned empty credentials, keeping STUN fallback");
           }
+        } else {
+          console.warn("[WebRTC] TURN credentials endpoint returned:", response.status);
         }
       } catch (error) {
-        console.warn("Failed to fetch TURN credentials, using fallback STUN servers:", error.message);
+        console.warn("[WebRTC] Failed to fetch TURN credentials, using fallback STUN servers:", error.message);
       }
     };
     fetchTurnCredentials();

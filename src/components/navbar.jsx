@@ -3,9 +3,10 @@ import Profile from "./profile"
 import { useNavigate } from 'react-router-dom';
 // import LoginAuthPage from "./loginAuth";
 
+import logo from "../assets/logo.png";
+
 export default function NavbarComponent({ loginCard, isLoggedIn, setIsLoggedIn, onSuccess }) {
   const navigate = useNavigate();
-  // const [stateChange, setStateChange] = useState(false)
 
   const handleClick = () => {
     navigate('/meet');
@@ -22,6 +23,16 @@ export default function NavbarComponent({ loginCard, isLoggedIn, setIsLoggedIn, 
     <>
       <div className="navbar-wrapper">
         <div className="navbar-logo-container">
+          <img
+            src={logo}
+            alt="Vi Meet Logo"
+            style={{
+              height: "35px",
+              width: "35px",
+              borderRadius: "50%",
+              objectFit: "cover",
+            }}
+          />
           <div
             style={{
               color: "white",

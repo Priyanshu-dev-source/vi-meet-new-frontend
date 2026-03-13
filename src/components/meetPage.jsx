@@ -1,6 +1,6 @@
 import React from "react";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Webcam from "react-webcam";
 
 const AudioComponent = ({ isAudioOn }) => {
@@ -47,6 +47,14 @@ export default function MeetPage({
   const [userName, setUserName] = useState("");
   const [roomId, setRoomId] = useState("");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const code = searchParams.get("code");
+    if (code) {
+      setRoomId(code);
+    }
+  }, [searchParams]);
 
   const handleMicSvg = () => {
     setMicSvg(micSvg === "micOff" ? "micOn" : "micOff");
@@ -125,6 +133,7 @@ export default function MeetPage({
             <input
               type="text"
               placeholder="Enter code"
+              value={roomId}
               onChange={(e) => setRoomId(e.target.value)}
             />
           </div>
